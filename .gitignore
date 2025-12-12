@@ -43,7 +43,6 @@ eqe-frontend/node_modules/
 dist/
 build/
 dist_electron/
-eqe-frontend/dist/
 eqe-frontend/dist_electron/
 
 # --- ORTAM DEGISKENLERI ---
