@@ -1,4 +1,4 @@
-# Logs
+
 logs
 *.log
 npm-debug.log*
@@ -7,12 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
 
-# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,28 +17,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-# --- SISTEM DOSYALARI ---
-.DS_Store
 Thumbs.db
-*.log
 
-# --- PYTHON (BACKEND) ---
 venv/
 __pycache__/
 *.pyc
 eqe.db
 *.spec
+EQE_Backend/build/
+EQE_Backend/dist/
 
-# --- NODE.JS (FRONTEND) ---
+
 node_modules/
 eqe-frontend/node_modules/
 
-# --- BUILD CIKTILARI (HATA VEREN DOSYALAR BURADA) ---
-# Bunlari bilgisayarinda tut ama GitHub'a gonderme
-dist/
-build/
+
 dist_electron/
 eqe-frontend/dist_electron/
 
-# --- ORTAM DEGISKENLERI ---
+
+
 .env
+.env.local
