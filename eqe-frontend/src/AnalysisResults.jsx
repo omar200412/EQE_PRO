@@ -1,118 +1,186 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, CartesianGrid 
 } from 'recharts';
 
-const CustomTooltip = ({ active, payload, label, unit }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div style={{
-        backgroundColor: 'rgba(20, 20, 20, 0.95)',
-        border: '1px solid #444', padding: '15px', borderRadius: '8px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)', minWidth: '150px'
-      }}>
-        <p style={{ margin: '0 0 10px 0', color: '#aaa', fontSize: '0.85rem', borderBottom:'1px solid #333', paddingBottom:'5px' }}>{label || 'Detay'}</p>
-        {payload.map((entry, index) => (
-          <p key={index} style={{ margin: '3px 0', color: entry.color, fontSize: '0.95rem', fontWeight: 'bold' }}>
-            {entry.name}: <span style={{color:'#fff'}}>{entry.value} {unit}</span>
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
+function AnalysisResults({ data }) {
+  const [mode, setMode] = useState('yaz');
+  const [animate, setAnimate] = useState(false);
 
-const AnalysisResults = ({ data, season }) => {
-  if (!data) return null;
+  useEffect(() => { setAnimate(true); }, []);
 
-  if (data.toplam_tuketim === 0 && data.gunes_uretim === 0) {
+  const activeData = mode === 'yaz' ? data.aylik_rapor.yaz : data.aylik_rapor.kis;
+  
+  // --- VERİ HAZIRLIĞI ---
+  const chartData = [
+    { name: 'Tüketim', deger: activeData.toplam_tuketim, fill: '#64748b' },
+    { name: 'Üretim', deger: activeData.gunes_uretim, fill: '#10b981' },
+    { name: 'Şebeke', deger: activeData.sebekeden_cekilen, fill: '#ef4444' }
+  ];
+
+  // Pie Chart Sınırlandırma
+  const chartSolarValue = activeData.gunes_uretim > activeData.toplam_tuketim 
+      ? activeData.toplam_tuketim 
+      : activeData.gunes_uretim;
+  
+  const pieData = [
+    { name: 'Yeşil Enerji', value: chartSolarValue },
+    { name: 'Şebeke', value: activeData.sebekeden_cekilen }
+  ];
+  
+  const COLORS = ['#10b981', '#ef4444'];
+  const treeCount = activeData.kurtarilan_karbon ? (activeData.kurtarilan_karbon / 20).toFixed(1) : 0;
+  
+  // Yüzdelik (Yazı İçin)
+  const totalConsumption = activeData.toplam_tuketim > 0 ? activeData.toplam_tuketim : 1;
+  let rawSolarPercentage = Math.round((activeData.gunes_uretim / totalConsumption) * 100);
+  const displayPercentage = Math.min(100, rawSolarPercentage);
+  const gridPercentage = Math.round((activeData.sebekeden_cekilen / totalConsumption) * 100);
+  
+  let efficiencyIndex = displayPercentage;
+
+  // --- ANA MESAJI BULMA (EN ÖNEMLİ KISIM) ---
+  // Listeden en üstteki mesajı çekiyoruz (Backend zaten önem sırasına göre dizdi)
+  const mainMessage = activeData.oneriler && activeData.oneriler.length > 0 
+      ? activeData.oneriler[0] 
+      : { baslik: "Analiz Tamamlandı", detay: "Sonuçları inceleyebilirsiniz.", tip: "bilgi" };
+
+  // Ana Mesajın Rengi
+  const getBannerStyle = (tip) => {
+      switch(tip) {
+          case 'kritik': return { bg: '#ef4444', icon: '🚨', text: 'white' }; // Kırmızı
+          case 'uyari': return { bg: '#f59e0b', icon: '⚠️', text: 'black' }; // Sarı/Turuncu
+          case 'firsat': return { bg: '#3b82f6', icon: '💡', text: 'white' }; // Mavi
+          case 'basari': return { bg: '#10b981', icon: '✅', text: 'white' }; // Yeşil
+          default: return { bg: '#1e293b', icon: 'ℹ️', text: 'white' }; // Gri
+      }
+  };
+  const bannerStyle = getBannerStyle(mainMessage.tip);
+
+  const downloadPDF = async () => {
+    try {
+      let host = window.location.hostname || '127.0.0.1';
+      const apiUrl = `http://${host}:5000/api/rapor-indir`;
+      const response = await fetch(apiUrl, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ozet: activeData })
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = "Rapor.pdf";
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+    } catch (e) { alert("Hata"); }
+  };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const color = payload[0].payload.fill || COLORS[0];
       return (
-        <div className="fade-in" style={{textAlign:'center', padding:'60px', color:'#555', border:'2px dashed #333', borderRadius:'10px'}}>
-            <h2>📭 Veri Bekleniyor...</h2>
-            <p>Sol menüden cihaz ve güneş paneli ekleyiniz.</p>
+        <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${color}`, padding: '12px', borderRadius: '8px', color:'white' }}>
+          <p style={{ margin: 0, fontWeight: 'bold' }}>{label || payload[0].name}</p>
+          <p style={{ margin: 0, fontSize:'1.1rem' }}>{`${payload[0].value.toFixed(1)} kWh`}</p>
         </div>
       );
-  }
-
-  const pieData = [
-    { name: 'Güneş', value: data.gunes_uretim },
-    { name: 'Şebeke', value: data.sebekeden_cekilen } 
-  ];
-  const COLORS = ['#00d25b', '#fc424a']; 
-
-  const barData = [
-    { name: 'Fatura Analizi', 'Normal': data.eski_fatura, 'İndirimli': data.yeni_fatura }
-  ];
+    }
+    return null;
+  };
 
   return (
-    <div className="fade-in">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'25px'}}>
-         <h2 style={{margin:0, fontSize:'1.8rem'}}>📊 Analiz Raporu</h2>
-         <span style={{
-             background: season === 'kis' ? 'linear-gradient(45deg, #36a2eb, #0056b3)' : 'linear-gradient(45deg, #ff9f43, #ff6b6b)',
-             color: 'white', padding: '8px 20px', borderRadius: '30px', fontSize: '0.9rem', fontWeight: 'bold',
-             boxShadow: season === 'kis' ? '0 0 15px rgba(54, 162, 235, 0.4)' : '0 0 15px rgba(255, 159, 67, 0.4)'
-         }}>
-             {season === 'kis' ? '❄️ KIŞ MODU' : '☀️ YAZ MODU'}
-         </span>
+    <div className={`fade-in`} style={{opacity: animate ? 1 : 0}}>
+      
+      {/* --- YENİ EKLENEN: ANA DURUM PANELİ (STATUS BANNER) --- */}
+      <div className="card hover-glow" style={{
+          backgroundColor: bannerStyle.bg, 
+          color: bannerStyle.text,
+          border: 'none',
+          padding: '25px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px',
+          marginBottom: '30px',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)'
+      }}>
+          <div style={{fontSize: '3rem', lineHeight: 1}}>{bannerStyle.icon}</div>
+          <div>
+              <h2 style={{margin: 0, fontSize: '1.8rem', textTransform: 'uppercase'}}>{mainMessage.baslik}</h2>
+              <p style={{margin: '5px 0 0 0', opacity: 0.9, fontSize: '1.1rem'}}>{mainMessage.detay}</p>
+          </div>
       </div>
 
-      <div className="grid-2">
-         <div className="card hover-glow" style={{height: '400px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center'}}>
-            <h3 style={{marginBottom:'20px'}}>Enerji Kaynağı (kWh)</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
-                  {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip unit="kWh" />} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle"/>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{textAlign:'center', marginTop:'10px', fontSize:'0.9rem', color:'#aaa', background:'#222', padding:'5px 15px', borderRadius:'15px'}}>
-                Toplam İhtiyaç: <b style={{color:'#fff'}}>{data.toplam_tuketim} kWh</b>
+      {/* HEADER (Butonlar Burada) */}
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'20px', marginBottom:'30px', background: 'var(--card-bg)', padding:'25px', borderRadius:'16px', border:'1px solid var(--card-border)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+            <div style={{position:'relative', width:'70px', height:'70px'}}>
+                <svg width="70" height="70" viewBox="0 0 100 100" style={{transform:'rotate(-90deg)'}}>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#334155" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="45" fill="none" stroke={efficiencyIndex > 50 ? '#10b981' : '#f59e0b'} strokeWidth="8" strokeDasharray="283" strokeDashoffset={283 - (283 * efficiencyIndex / 100)} strokeLinecap="round" />
+                </svg>
+                <div style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', fontWeight:'bold', fontSize:'1.2rem', color:'var(--text-color)'}}>{efficiencyIndex}</div>
+            </div>
+            <div><h2 style={{fontSize:'1.5rem', margin:0, color:'var(--text-color)'}}>Operasyonel Rapor</h2><span style={{fontSize:'0.9rem', color:'var(--secondary-text)'}}>Detaylı Verimlilik Analizi</span></div>
+        </div>
+        <div style={{display:'flex', gap:'12px'}}>
+             <button onClick={downloadPDF} className="hover-glow" style={{padding:'12px 25px', background:'#334155', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>📥 PDF İNDİR</button>
+             <div style={{background:'var(--input-bg)', padding:'4px', borderRadius:'8px', display:'flex'}}>
+                 <button onClick={() => setMode('yaz')} style={{padding:'8px 20px', border:'none', background: mode==='yaz'?'#f59e0b':'transparent', color: mode==='yaz'?'white':'var(--secondary-text)', borderRadius:'6px', cursor:'pointer'}}>YAZ</button>
+                 <button onClick={() => setMode('kis')} style={{padding:'8px 20px', border:'none', background: mode==='kis'?'#3b82f6':'transparent', color: mode==='kis'?'white':'var(--secondary-text)', borderRadius:'6px', cursor:'pointer'}}>KIŞ</button>
+             </div>
+        </div>
+      </div>
+
+      {/* KPI KARTLARI */}
+      <div className="grid-2" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap:'20px', marginBottom:'30px'}}>
+        <div className="card hover-glow" style={{borderLeft:'4px solid #ef4444'}}><h4 style={{margin:0, color:'var(--secondary-text)'}}>GİDER</h4><h1 style={{margin:'10px 0', color:'var(--text-color)'}}>{activeData.eski_fatura} TL</h1></div>
+        <div className="card hover-glow glow-success" style={{borderLeft:'4px solid #10b981', background:'linear-gradient(145deg, var(--card-bg), rgba(16, 185, 129, 0.05))'}}><h4 style={{margin:0, color:'#10b981'}}>TASARRUF</h4><h1 style={{margin:'10px 0', color:'#10b981'}}>{activeData.tasarruf_tl} TL</h1></div>
+        <div className="card hover-glow glow-warning" style={{borderLeft:'4px solid #f59e0b', background:'linear-gradient(145deg, var(--card-bg), rgba(245, 158, 11, 0.05))'}}><h4 style={{margin:0, color:'#f59e0b'}}>ROI</h4><h1 style={{margin:'10px 0', color:'#f59e0b'}}>{activeData.roi_ay > 0 ? (activeData.roi_ay/12).toFixed(1) : '-'} Yıl</h1></div>
+        <div className="card hover-glow glow-success" style={{borderLeft:'4px solid #34d399'}}><h4 style={{margin:0, color:'#34d399'}}>DOĞA</h4><h1 style={{margin:'10px 0', color:'#34d399'}}>{treeCount} Ağaç</h1></div>
+      </div>
+
+      {/* GRAFIKLER */}
+      <div className="grid-2" style={{gap:'25px', marginBottom:'30px'}}>
+         <div className="card hover-glow" style={{height:'400px'}}>
+            <h4 style={{marginBottom:'20px', borderBottom:'1px solid var(--card-border)', paddingBottom:'10px'}}>⚡ Denge</h4>
+            <ResponsiveContainer width="100%" height="90%"><BarChart data={chartData} margin={{top:10, right:10, left:-20, bottom:0}}><CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false}/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill:'var(--secondary-text)'}}/><YAxis axisLine={false} tickLine={false} tick={{fill:'var(--secondary-text)'}}/><Tooltip content={<CustomTooltip/>}/><Bar dataKey="deger" radius={[6,6,0,0]}>{chartData.map((e,i)=><Cell key={i} fill={e.fill}/>)}</Bar></BarChart></ResponsiveContainer>
+         </div>
+         <div className="card hover-glow" style={{display:'flex', flexWrap:'wrap', gap:'20px', alignItems:'center'}}>
+            <div style={{flex:'1 1 200px', height:'350px', position:'relative'}}>
+                <h4 style={{position:'absolute'}}>🌍 Dağılım</h4>
+                <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} innerRadius={85} outerRadius={120} paddingAngle={4} dataKey="value" stroke="var(--card-bg)">{pieData.map((e,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip content={<CustomTooltip/>}/><text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fill="var(--text-color)" style={{fontSize:'1.8rem', fontWeight:'bold'}}>%{displayPercentage}</text></PieChart></ResponsiveContainer>
+            </div>
+            <div style={{flex:'1 1 200px', display:'flex', flexDirection:'column', gap:'20px', padding:'10px'}}>
+                <div style={{borderLeft:'4px solid #10b981', paddingLeft:'15px'}}><h2 style={{margin:0, color:'#10b981', fontSize:'1.2rem'}}>%{displayPercentage} Yeşil</h2><p style={{opacity:0.8, fontSize:'0.9rem'}}>Temiz enerji kullanımı.</p></div>
+                <div style={{borderLeft:'4px solid #ef4444', paddingLeft:'15px'}}><h2 style={{margin:0, color:'#ef4444', fontSize:'1.2rem'}}>%{gridPercentage} Şebeke</h2><p style={{opacity:0.8, fontSize:'0.9rem'}}>Dışa bağımlılık oranı.</p></div>
             </div>
          </div>
+      </div>
 
-         <div className="card hover-glow" style={{height: '400px'}}>
-            <h3 style={{marginBottom:'20px', textAlign:'center'}}>Fatura Karşılaştırma (TL)</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={barData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }} barGap={20}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis dataKey="name" stroke="#666" tick={{fill: '#888'}} />
-                <YAxis stroke="#666" tick={{fill: '#888'}} unit="₺" width={60}/>
-                <Tooltip content={<CustomTooltip unit="TL" />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                <Legend verticalAlign="top" align="right" iconType="circle"/>
-                <Bar dataKey="Normal" fill="#fc424a" radius={[6, 6, 0, 0]} name="Güneşsiz Fatura" barSize={50} animationDuration={1500}/>
-                <Bar dataKey="İndirimli" fill="#00d25b" radius={[6, 6, 0, 0]} name="Ödenecek Tutar" barSize={50} animationDuration={1500}/>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* DİĞER ÖNERİLER (Listenin geri kalanı aşağıda kalıyor) */}
+      {activeData.oneriler && activeData.oneriler.length > 1 && (
+         <div className="card hover-glow" style={{borderTop:'4px solid var(--accent-color)'}}>
+             <h3 style={{marginBottom:'20px'}}>📋 Diğer Tespitler</h3>
+             <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(350px, 1fr))', gap:'15px'}}>
+                {activeData.oneriler.slice(1).map((oneri, i) => { // İlk mesajı yukarı koyduk, diğerleri burada
+                    let borderCol='#3b82f6', bgCol='rgba(59, 130, 246, 0.1)', icon='ℹ️';
+                    if (oneri.tip === 'kritik') { borderCol='#ef4444'; bgCol='rgba(239, 68, 68, 0.1)'; icon='🚨'; }
+                    if (oneri.tip === 'firsat') { borderCol='#10b981'; bgCol='rgba(16, 185, 129, 0.1)'; icon='💎'; }
+                    if (oneri.tip === 'uyari')  { borderCol='#f59e0b'; bgCol='rgba(245, 158, 11, 0.1)'; icon='⚠️'; }
+                    if (oneri.tip === 'basari') { borderCol='#8b5cf6'; bgCol='rgba(139, 92, 246, 0.1)'; icon='🌟'; }
+                    
+                    return (
+                        <div key={i} className="hover-glow" style={{padding:'20px', borderRadius:'8px', background: bgCol, borderLeft: `4px solid ${borderCol}`, cursor:'default'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}><span style={{fontSize:'1.4rem'}}>{icon}</span><b style={{color: 'var(--text-color)', fontSize:'1rem'}}>{oneri.baslik}</b></div>
+                            <p style={{margin:0, color:'var(--text-color)', opacity:0.8, fontSize:'0.9rem', lineHeight:'1.5'}}>{oneri.detay}</p>
+                        </div>
+                    )
+                })}
+             </div>
          </div>
-      </div>
-
-      <div className="grid-2" style={{marginTop:'20px'}}>
-          <div className="card hover-glow" style={{borderLeft:'5px solid #8f5fe8', display:'flex', alignItems:'center', justifyContent:'space-between', background: 'linear-gradient(90deg, #1e1e1e 0%, #252525 100%)'}}>
-              <div>
-                  <h4 style={{margin:'0 0 5px 0', color:'#aaa', textTransform:'uppercase', fontSize:'0.8rem'}}>Aylık Net Tasarruf</h4>
-                  <h1 style={{margin:0, fontSize:'2.8rem', color:'#8f5fe8', textShadow:'0 0 20px rgba(143, 95, 232, 0.3)'}}>{data.tasarruf_tl} TL</h1>
-              </div>
-              <div style={{fontSize:'3.5rem', opacity:0.8}}>💰</div>
-          </div>
-
-          <div className="card hover-glow" style={{borderLeft:'5px solid #36a2eb', display:'flex', alignItems:'center', justifyContent:'space-between', background: 'linear-gradient(90deg, #1e1e1e 0%, #252525 100%)'}}>
-              <div>
-                  <h4 style={{margin:'0 0 5px 0', color:'#aaa', textTransform:'uppercase', fontSize:'0.8rem'}}>Karbon İzi</h4>
-                  <h1 style={{margin:0, fontSize:'2.8rem', color: data.karbon > 0 ? '#fc424a' : '#00d25b', textShadow:'0 0 20px rgba(54, 162, 235, 0.3)'}}>
-                      {data.karbon} <span style={{fontSize:'1.2rem'}}>kg</span>
-                  </h1>
-                  <small style={{color:'#666'}}>{data.karbon === 0 ? "🌱 Harika! Sıfır Salınım" : `⚠️ ${data.kurtarilan_karbon} kg engellendi`}</small>
-              </div>
-              <div style={{fontSize:'3.5rem', opacity:0.8}}>🌍</div>
-          </div>
-      </div>
+      )}
     </div>
   );
-};
+}
+
 export default AnalysisResults;
