@@ -12,14 +12,12 @@ function AnalysisResults({ data }) {
 
   const activeData = mode === 'yaz' ? data.aylik_rapor.yaz : data.aylik_rapor.kis;
   
-  // --- VERİ HAZIRLIĞI ---
   const chartData = [
     { name: 'Tüketim', deger: activeData.toplam_tuketim, fill: '#64748b' },
     { name: 'Üretim', deger: activeData.gunes_uretim, fill: '#10b981' },
     { name: 'Şebeke', deger: activeData.sebekeden_cekilen, fill: '#ef4444' }
   ];
 
-  // Pie Chart Sınırlandırma
   const chartSolarValue = activeData.gunes_uretim > activeData.toplam_tuketim 
       ? activeData.toplam_tuketim 
       : activeData.gunes_uretim;
@@ -32,7 +30,6 @@ function AnalysisResults({ data }) {
   const COLORS = ['#10b981', '#ef4444'];
   const treeCount = activeData.kurtarilan_karbon ? (activeData.kurtarilan_karbon / 20).toFixed(1) : 0;
   
-  // Yüzdelik (Yazı İçin)
   const totalConsumption = activeData.toplam_tuketim > 0 ? activeData.toplam_tuketim : 1;
   let rawSolarPercentage = Math.round((activeData.gunes_uretim / totalConsumption) * 100);
   const displayPercentage = Math.min(100, rawSolarPercentage);
@@ -40,28 +37,26 @@ function AnalysisResults({ data }) {
   
   let efficiencyIndex = displayPercentage;
 
-  // --- ANA MESAJI BULMA (EN ÖNEMLİ KISIM) ---
-  // Listeden en üstteki mesajı çekiyoruz (Backend zaten önem sırasına göre dizdi)
-  const mainMessage = activeData.oneriler && activeData.oneriler.length > 0 
+  const mainMessage = (activeData.oneriler && activeData.oneriler.length > 0)
       ? activeData.oneriler[0] 
-      : { baslik: "Analiz Tamamlandı", detay: "Sonuçları inceleyebilirsiniz.", tip: "bilgi" };
+      : { baslik: "Analiz Bekleniyor", detay: "Henüz yeterli veri girişi yapılmadı.", tip: "bilgi" };
 
-  // Ana Mesajın Rengi
   const getBannerStyle = (tip) => {
       switch(tip) {
-          case 'kritik': return { bg: '#ef4444', icon: '🚨', text: 'white' }; // Kırmızı
-          case 'uyari': return { bg: '#f59e0b', icon: '⚠️', text: 'black' }; // Sarı/Turuncu
-          case 'firsat': return { bg: '#3b82f6', icon: '💡', text: 'white' }; // Mavi
-          case 'basari': return { bg: '#10b981', icon: '✅', text: 'white' }; // Yeşil
-          default: return { bg: '#1e293b', icon: 'ℹ️', text: 'white' }; // Gri
+          case 'kritik': return { bg: '#ef4444', icon: '🚨', text: 'white', border: '#b91c1c' };
+          case 'uyari': return { bg: '#f59e0b', icon: '⚠️', text: 'black', border: '#d97706' };
+          case 'firsat': return { bg: '#3b82f6', icon: '💡', text: 'white', border: '#2563eb' };
+          case 'basari': return { bg: '#10b981', icon: '✅', text: 'white', border: '#059669' };
+          default: return { bg: '#1e293b', icon: 'ℹ️', text: 'white', border: '#334155' };
       }
   };
   const bannerStyle = getBannerStyle(mainMessage.tip);
 
+  // --- URL DÜZELTMESİ YAPILDI (Sadece /api/...) ---
   const downloadPDF = async () => {
     try {
-      let host = window.location.hostname || '127.0.0.1';
-      const apiUrl = `http://${host}:5000/api/rapor-indir`;
+      const apiUrl = '/api/rapor-indir'; // DÜZELDİ: http://localhost YOK
+      
       const response = await fetch(apiUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ozet: activeData })
@@ -69,10 +64,12 @@ function AnalysisResults({ data }) {
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = "Rapor.pdf";
+        const a = document.createElement('a'); a.href = url; a.download = "EQE_Rapor.pdf";
         document.body.appendChild(a); a.click(); a.remove();
+      } else {
+        alert("PDF oluşturulurken bir hata oluştu.");
       }
-    } catch (e) { alert("Hata"); }
+    } catch (e) { alert("Sunucu hatası: PDF indirilemedi."); }
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -91,26 +88,32 @@ function AnalysisResults({ data }) {
   return (
     <div className={`fade-in`} style={{opacity: animate ? 1 : 0}}>
       
-      {/* --- YENİ EKLENEN: ANA DURUM PANELİ (STATUS BANNER) --- */}
-      <div className="card hover-glow" style={{
+      {/* SİSTEM DURUM PANELI */}
+      <div style={{
           backgroundColor: bannerStyle.bg, 
           color: bannerStyle.text,
-          border: 'none',
-          padding: '25px',
+          borderRadius: '12px',
+          padding: '20px',
           display: 'flex',
           alignItems: 'center',
           gap: '20px',
           marginBottom: '30px',
-          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)'
+          border: `2px solid ${bannerStyle.border}`,
+          boxShadow: '0 10px 30px -5px rgba(0,0,0,0.4)',
+          transform: 'scale(1.02)'
       }}>
-          <div style={{fontSize: '3rem', lineHeight: 1}}>{bannerStyle.icon}</div>
+          <div style={{fontSize: '3.5rem', lineHeight: 1}}>{bannerStyle.icon}</div>
           <div>
-              <h2 style={{margin: 0, fontSize: '1.8rem', textTransform: 'uppercase'}}>{mainMessage.baslik}</h2>
-              <p style={{margin: '5px 0 0 0', opacity: 0.9, fontSize: '1.1rem'}}>{mainMessage.detay}</p>
+              <h2 style={{margin: 0, fontSize: '1.6rem', textTransform: 'uppercase', fontWeight:'800', letterSpacing:'1px'}}>
+                  {mainMessage.baslik}
+              </h2>
+              <p style={{margin: '5px 0 0 0', opacity: 0.9, fontSize: '1.1rem', fontWeight:'500'}}>
+                  {mainMessage.detay}
+              </p>
           </div>
       </div>
 
-      {/* HEADER (Butonlar Burada) */}
+      {/* HEADER */}
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'20px', marginBottom:'30px', background: 'var(--card-bg)', padding:'25px', borderRadius:'16px', border:'1px solid var(--card-border)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}}>
         <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
             <div style={{position:'relative', width:'70px', height:'70px'}}>
@@ -157,12 +160,12 @@ function AnalysisResults({ data }) {
          </div>
       </div>
 
-      {/* DİĞER ÖNERİLER (Listenin geri kalanı aşağıda kalıyor) */}
+      {/* DİĞER ÖNERİLER */}
       {activeData.oneriler && activeData.oneriler.length > 1 && (
          <div className="card hover-glow" style={{borderTop:'4px solid var(--accent-color)'}}>
              <h3 style={{marginBottom:'20px'}}>📋 Diğer Tespitler</h3>
              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(350px, 1fr))', gap:'15px'}}>
-                {activeData.oneriler.slice(1).map((oneri, i) => { // İlk mesajı yukarı koyduk, diğerleri burada
+                {activeData.oneriler.slice(1).map((oneri, i) => { 
                     let borderCol='#3b82f6', bgCol='rgba(59, 130, 246, 0.1)', icon='ℹ️';
                     if (oneri.tip === 'kritik') { borderCol='#ef4444'; bgCol='rgba(239, 68, 68, 0.1)'; icon='🚨'; }
                     if (oneri.tip === 'firsat') { borderCol='#10b981'; bgCol='rgba(16, 185, 129, 0.1)'; icon='💎'; }

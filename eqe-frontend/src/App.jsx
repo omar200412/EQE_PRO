@@ -6,7 +6,6 @@ function App() {
   const [region, setRegion] = useState('marmara');
   const [price, setPrice] = useState(3.50); 
   
-  // Envanter
   const [devices, setDevices] = useState([]);
   const [newDevice, setNewDevice] = useState({ type: 'Sanayi Tipi Klima (VRF)', watt: 4500, saat: 10, count: 1 });
   
@@ -37,24 +36,22 @@ function App() {
     setDevices(devices.filter(d => d.id !== id));
   };
 
-  // --- KAYDETME VE YÜKLEME FONKSİYONLARI (YENİ) ---
+  // --- URL DÜZELTMESİ YAPILDI (Sadece /api/...) ---
   const saveProfile = async () => {
     try {
-      let host = window.location.hostname || '127.0.0.1';
       const payload = { settings: { region, price }, devices, solar, lighting };
       
-      const res = await fetch(`http://${host}:5000/api/kaydet`, {
+      const res = await fetch('/api/kaydet', { // DÜZELDİ: http://localhost YOK
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) alert("✅ Proje Başarıyla Kaydedildi!");
-    } catch (e) { alert("Kaydetme Hatası!"); }
+    } catch (e) { alert("Kaydetme Hatası! Sunucuya ulaşılamıyor."); }
   };
 
   const loadProfile = async () => {
     try {
-      let host = window.location.hostname || '127.0.0.1';
-      const res = await fetch(`http://${host}:5000/api/yukle`);
+      const res = await fetch('/api/yukle'); // DÜZELDİ: http://localhost YOK
       if (res.ok) {
         const data = await res.json();
         if (data.settings) {
@@ -66,24 +63,26 @@ function App() {
         if (data.lighting) setLighting(data.lighting);
         alert("📂 Proje Yüklendi!");
       }
-    } catch (e) { alert("Yükleme Hatası!"); }
+    } catch (e) { alert("Yükleme Hatası! Sunucuya ulaşılamıyor."); }
   };
 
   const calculate = async () => {
     setLoading(true);
     try {
-      let host = window.location.hostname || '127.0.0.1';
-      const apiUrl = `http://${host}:5000/api/analiz-mevsimsel`;
       const payload = { settings: { region, price }, devices, solar, lighting };
 
-      const res = await fetch(apiUrl, {
+      const res = await fetch('/api/analiz-mevsimsel', { // DÜZELDİ: http://localhost YOK
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
       if (!res.ok) throw new Error("API Hatası");
       const data = await res.json();
       setResults(data);
-    } catch (err) { alert("Sunucu Bağlantı Hatası"); } finally { setLoading(false); }
+    } catch (err) { 
+        console.error(err);
+        alert("Sunucu Bağlantı Hatası! Lütfen internet bağlantınızı kontrol edin."); 
+    } finally { setLoading(false); }
   };
 
   return (
@@ -108,7 +107,6 @@ function App() {
         </div>
 
         <div style={{display:'flex', gap:'10px'}}>
-            {/* KAYDET / YÜKLE BUTONLARI */}
             <button onClick={saveProfile} className="card" style={{padding:'8px 16px', cursor:'pointer', marginBottom:0, background:'var(--accent-color)', color:'white', border:'none'}}>💾 Kaydet</button>
             <button onClick={loadProfile} className="card" style={{padding:'8px 16px', cursor:'pointer', marginBottom:0}}>📂 Yükle</button>
             <button onClick={toggleTheme} className="card" style={{padding: '8px 16px', cursor: 'pointer', marginBottom: 0}}>
@@ -120,7 +118,6 @@ function App() {
       {/* INPUT ALANLARI */}
       <div className="grid-2">
         <div>
-          {/* TESİS */}
           <div className="card">
             <h3>🏭 Tesis Ayarları</h3>
             <div className="grid-2">
@@ -143,7 +140,6 @@ function App() {
             </div>
           </div>
 
-          {/* ENVANTER */}
           <div className="card">
             <h3>⚙️ Ekipman Envanteri</h3>
             <div className="grid-2">
@@ -186,7 +182,6 @@ function App() {
         </div>
 
         <div>
-          {/* AYDINLATMA */}
           <div className="card">
             <h3>💡 Aydınlatma Altyapısı</h3>
             <div className="grid-2">
@@ -199,7 +194,6 @@ function App() {
             </div>
           </div>
 
-          {/* GES */}
           <div className="card">
             <h3>☀️ Yenilenebilir Enerji (GES)</h3>
             <label>Planlanan Kurulu Güç (kWp)</label>
@@ -208,7 +202,6 @@ function App() {
             <input type="number" placeholder="Örn: 1000000" value={solar.cost} onChange={e => setSolar({...solar, cost: Number(e.target.value)})} />
           </div>
 
-          {/* ANALİZ BUTONU */}
           <button 
             className="btn-primary pulse-btn" 
             style={{marginTop:'20px', fontSize:'1.2rem', padding:'20px', background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)', boxShadow: '0 10px 20px -5px rgba(16, 185, 129, 0.4)', letterSpacing: '1px'}} 
