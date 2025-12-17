@@ -28,6 +28,12 @@ function App() {
     localStorage.setItem('eqe-theme', newTheme);
   };
 
+  // Sayısal inputlarda 0 yerine boş string gösterimi sağlayan yardımcı fonksiyon
+  const handleNumChange = (value, setter, state, field) => {
+    const val = value === "" ? "" : Number(value);
+    setter({ ...state, [field]: val });
+  };
+
   const addDevice = () => {
     setDevices([...devices, { ...newDevice, id: Date.now() }]);
   };
@@ -36,13 +42,12 @@ function App() {
     setDevices(devices.filter(d => d.id !== id));
   };
 
-  // --- URL DÜZELTMESİ YAPILDI (Sadece /api/...) ---
   const saveProfile = async () => {
     try {
       const payload = { settings: { region, price }, devices, solar, lighting };
-      
-      const res = await fetch('/api/kaydet', { // DÜZELDİ: http://localhost YOK
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await fetch('/api/kaydet', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) alert("✅ Proje Başarıyla Kaydedildi!");
@@ -51,37 +56,32 @@ function App() {
 
   const loadProfile = async () => {
     try {
-      const res = await fetch('/api/yukle'); // DÜZELDİ: http://localhost YOK
+      const res = await fetch('/api/yukle');
       if (res.ok) {
         const data = await res.json();
-        if (data.settings) {
-            setRegion(data.settings.region);
-            setPrice(data.settings.price);
-        }
+        if (data.settings) { setRegion(data.settings.region); setPrice(data.settings.price); }
         if (data.devices) setDevices(data.devices);
         if (data.solar) setSolar(data.solar);
         if (data.lighting) setLighting(data.lighting);
         alert("📂 Proje Yüklendi!");
       }
-    } catch (e) { alert("Yükleme Hatası! Sunucuya ulaşılamıyor."); }
+    } catch (e) { alert("Yükleme Hatası!"); }
   };
 
   const calculate = async () => {
     setLoading(true);
     try {
       const payload = { settings: { region, price }, devices, solar, lighting };
-
-      const res = await fetch('/api/analiz-mevsimsel', { // DÜZELDİ: http://localhost YOK
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await fetch('/api/analiz-mevsimsel', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
       if (!res.ok) throw new Error("API Hatası");
       const data = await res.json();
       setResults(data);
     } catch (err) { 
-        console.error(err);
-        alert("Sunucu Bağlantı Hatası! Lütfen internet bağlantınızı kontrol edin."); 
+        alert("Sunucu Bağlantı Hatası! Lütfen backend sunucunuzun 5000 portunda çalıştığından emin olun."); 
     } finally { setLoading(false); }
   };
 
@@ -135,7 +135,7 @@ function App() {
               </div>
               <div>
                 <label>Birim Fiyat (TL/kWh)</label>
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)} />
+                <input type="number" value={price === 0 ? "" : price} onChange={e => setPrice(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
             </div>
           </div>
@@ -158,12 +158,12 @@ function App() {
               </div>
               <div>
                 <label>Güç (Watt)</label>
-                <input type="number" value={newDevice.watt} onChange={e => setNewDevice({...newDevice, watt: Number(e.target.value)})} />
+                <input type="number" value={newDevice.watt === 0 ? "" : newDevice.watt} onChange={e => handleNumChange(e.target.value, setNewDevice, newDevice, 'watt')} />
               </div>
             </div>
             <div className="grid-2">
-                <div><label>Saat/Gün</label><input type="number" value={newDevice.saat} onChange={e => setNewDevice({...newDevice, saat: Number(e.target.value)})} /></div>
-                <div><label>Adet</label><input type="number" value={newDevice.count} onChange={e => setNewDevice({...newDevice, count: Number(e.target.value)})} /></div>
+                <div><label>Saat/Gün</label><input type="number" value={newDevice.saat === 0 ? "" : newDevice.saat} onChange={e => handleNumChange(e.target.value, setNewDevice, newDevice, 'saat')} /></div>
+                <div><label>Adet</label><input type="number" value={newDevice.count === 0 ? "" : newDevice.count} onChange={e => handleNumChange(e.target.value, setNewDevice, newDevice, 'count')} /></div>
             </div>
             <button className="btn-primary" onClick={addDevice} style={{background:'#334155'}}>+ ENVANTERE EKLE</button>
 
@@ -185,21 +185,21 @@ function App() {
           <div className="card">
             <h3>💡 Aydınlatma Altyapısı</h3>
             <div className="grid-2">
-              <div><label>Mevcut Armatür (W)</label><input type="number" value={lighting.oldW} onChange={e => setLighting({...lighting, oldW: Number(e.target.value)})} /></div>
-              <div><label>LED Panel (W)</label><input type="number" value={lighting.newW} onChange={e => setLighting({...lighting, newW: Number(e.target.value)})} /></div>
+              <div><label>Mevcut Armatür (W)</label><input type="number" value={lighting.oldW === 0 ? "" : lighting.oldW} onChange={e => handleNumChange(e.target.value, setLighting, lighting, 'oldW')} /></div>
+              <div><label>LED Panel (W)</label><input type="number" value={lighting.newW === 0 ? "" : lighting.newW} onChange={e => handleNumChange(e.target.value, setLighting, lighting, 'newW')} /></div>
             </div>
             <div className="grid-2">
-              <div><label>Toplam Adet</label><input type="number" value={lighting.count} onChange={e => setLighting({...lighting, count: Number(e.target.value)})} /></div>
-              <div><label>Saat/Gün</label><input type="number" value={lighting.hours} onChange={e => setLighting({...lighting, hours: Number(e.target.value)})} /></div>
+              <div><label>Toplam Adet</label><input type="number" value={lighting.count === 0 ? "" : lighting.count} onChange={e => handleNumChange(e.target.value, setLighting, lighting, 'count')} /></div>
+              <div><label>Saat/Gün</label><input type="number" value={lighting.hours === 0 ? "" : lighting.hours} onChange={e => handleNumChange(e.target.value, setLighting, lighting, 'hours')} /></div>
             </div>
           </div>
 
           <div className="card">
             <h3>☀️ Yenilenebilir Enerji (GES)</h3>
             <label>Planlanan Kurulu Güç (kWp)</label>
-            <input type="number" placeholder="Örn: 50" value={solar.power} onChange={e => setSolar({...solar, power: Number(e.target.value)})} />
+            <input type="number" value={solar.power === 0 ? "" : solar.power} onChange={e => handleNumChange(e.target.value, setSolar, solar, 'power')} />
             <label>Yatırım Bütçesi / CAPEX (TL)</label>
-            <input type="number" placeholder="Örn: 1000000" value={solar.cost} onChange={e => setSolar({...solar, cost: Number(e.target.value)})} />
+            <input type="number" value={solar.cost === 0 ? "" : solar.cost} onChange={e => handleNumChange(e.target.value, setSolar, solar, 'cost')} />
           </div>
 
           <button 

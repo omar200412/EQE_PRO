@@ -4,9 +4,14 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',
   server: {
-    host: true,
-    port: 5173,
+    proxy: {
+      // '/api' ile başlayan tüm istekleri 5000 portuna yönlendir
+      '/api': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   }
 })
